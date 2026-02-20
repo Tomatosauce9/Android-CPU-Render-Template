@@ -99,8 +99,7 @@ int main() {
     auto* get_menu_stateth = new std::thread(&get_menu_state);
     get_menu_stateth->detach();
 
-    bool running = true;
-    while (running) {
+    while (g_Config.renderloop) {
         auto now = std::chrono::steady_clock::now();
         auto newDisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
 
@@ -134,5 +133,8 @@ int main() {
 
         renderer.Present();
     }
+    delete get_menu_stateth;
+
+    return 0;
 
 }

@@ -15,10 +15,6 @@ AndroidRender& AndroidRender::GetInstance() {
     return instance;
 }
 
-AndroidRender::~AndroidRender() {
-    Release();
-}
-
 bool AndroidRender::Init(ANativeWindow *window, int width, int height) {
     std::lock_guard<std::mutex> lock(m_RenderMutex);
 
@@ -102,9 +98,17 @@ void AndroidRender::Present() {
 
 void AndroidRender::Release() {
     std::lock_guard<std::mutex> lock(m_RenderMutex);
-    m_Ctx.end();
+    if (m_Ctx._impl()) {
+        m_Ctx.end();
+    }
     m_Canvas.reset();
+    if (m_Window) {
+        android::ANativeWindowCreator::Destroy(m_Window);
+        m_Window = nullptr;
+    }
     android::ANativeWindowCreator::Cleanup();
-    ANativeWindow_release(m_Window);
-    m_Window = nullptr;
+}
+
+AndroidRender::~AndroidRender() {
+    Release();
 }

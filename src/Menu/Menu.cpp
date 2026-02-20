@@ -108,7 +108,7 @@ void Menu::RenderVisualCard() {
         }
 
         if (nk_button_label(&m_Ctx, "退出窗口"))
-            exit(0);
+            g_Config.renderloop = false;
 
         if (nk_button_label(&m_Ctx, "防录屏"))
             g_Config.permeate_record = !g_Config.permeate_record;

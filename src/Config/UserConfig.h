@@ -30,6 +30,7 @@ struct AimConfig {
 struct UserConfig {
     VisualConfig visual;
     AimConfig aim;
+    bool renderloop = true;
     bool permeate_record = false;
 };
 
