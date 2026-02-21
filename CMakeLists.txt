@@ -27,8 +27,13 @@ set(RENDERER_PERF_FLAGS
         "-fmerge-all-constants"
         "-fno-semantic-interposition"
 )
-set(SECURITY_FLAGS "-fstack-protector-strong -D_FORTIFY_SOURCE=2")
-set(COMMON_LINKER_FLAGS "-Wl,--gc-sections -Wl,--as-needed -Wl,-z,relro,-z,now")
+set(SECURITY_FLAGS -fstack-protector-strong -D_FORTIFY_SOURCE=2)
+set(COMMON_LINKER_FLAGS
+        "-Wl,--gc-sections"
+        "-Wl,--as-needed"
+        "-Wl,-z,relro"
+        "-Wl,-z,now"
+)
 
 add_library(blend2d STATIC IMPORTED)
 set_target_properties(blend2d PROPERTIES
