@@ -8,20 +8,20 @@ A high-performance Android CPU rendering template based on Blend2D and Nuklear U
 
 ## Supported Android Versions
 
-| 版本范围 | 支持状态 | 备注 |
-|---------|---------|------|
-| Android 5.0 - 5.1 | ✅ 完全支持 | API Level 21-22 |
-| Android 6.0 | ✅ 完全支持 | API Level 23 |
-| Android 7.0 - 7.1 | ✅ 完全支持 | API Level 24-25 |
-| Android 8.0 - 8.1 | ✅ 完全支持 | API Level 26-27 |
-| Android 9.0 | ✅ 完全支持 | API Level 28 |
-| Android 10.0 | ✅ 完全支持 | API Level 29 |
-| Android 11.0 | ✅ 完全支持 | API Level 30 |
-| Android 12.0 - 12.1 | ✅ 完全支持 | API Level 31-32 |
-| Android 13.0 | ✅ 完全支持 | API Level 33 |
-| Android 14.0 | ✅ 完全支持 | API Level 34 |
-| Android 15.0 | ✅ 完全支持 | API Level 35 |
-| Android 16.0 | ✅ 完全支持 | API Level 36 |
+| Android Version | Support Status | Notes |
+|-----------------|---------------|-------|
+| Android 5.0 - 5.1 | ✅ Fully Supported | API Level 21-22 |
+| Android 6.0 | ✅ Fully Supported | API Level 23 |
+| Android 7.0 - 7.1 | ✅ Fully Supported | API Level 24-25 |
+| Android 8.0 - 8.1 | ✅ Fully Supported | API Level 26-27 |
+| Android 9.0 | ✅ Fully Supported | API Level 28 |
+| Android 10.0 | ✅ Fully Supported | API Level 29 |
+| Android 11.0 | ✅ Fully Supported | API Level 30 |
+| Android 12.0 - 12.1 | ✅ Fully Supported | API Level 31-32 |
+| Android 13.0 | ✅ Fully Supported | API Level 33 |
+| Android 14.0 | ✅ Fully Supported | API Level 34 |
+| Android 15.0 | ✅ Fully Supported | API Level 35 |
+| Android 16.0 | ✅ Fully Supported | API Level 36 |
 
 ## Requirements
 
