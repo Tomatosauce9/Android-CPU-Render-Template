@@ -13,6 +13,7 @@
 #include "AndroidRender/AndroidRender.h"
 #include "Menu/Menu.h"
 #include "Config/UserConfig.h"
+#include "DrawManager/DrawManager.h"
 
 bool readTouchEvent = true;
 
@@ -99,7 +100,13 @@ int main() {
     auto* get_menu_stateth = new std::thread(&get_menu_state);
     get_menu_stateth->detach();
 
+    double frameTime = 0.0;
+    double fps = 0.0;
+
     while (g_Config.renderloop) {
+
+        auto frameStart = std::chrono::high_resolution_clock::now();
+
         auto now = std::chrono::steady_clock::now();
         auto newDisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
 
@@ -116,7 +123,8 @@ int main() {
             screenState.permeate_record = g_Config.permeate_record;
             renderer.Recreate(newDisplayInfo, g_Config.permeate_record, menu, font);
 
-            std::cout << "分辨率更新: " << screenState.screen_width << "x" << screenState.screen_height << std::endl;
+            std::cout << "分辨率更新: " << screenState.screen_width << "x" << screenState.screen_height  << std::endl;
+            std::cout << "防录屏更新: " << (g_Config.permeate_record ? "开启" : "关闭") << std::endl;
         }
 
         if (!g_Config.permeate_record) {
@@ -130,6 +138,42 @@ int main() {
 
         menu.Draw(renderer.GetWidth(), renderer.GetHeight());
         menu.Render(bctx);
+
+        BLPoint pX = {0,0};
+        BLPoint pY = {static_cast<double>(display.width),static_cast<double>(display.height)};
+
+        BLPoint p2X = {static_cast<double>(display.width),0};
+        BLPoint p2Y = {0,static_cast<double>(display.height)};
+
+        DrawManager::DrawOutlinedText(bctx, font, "TEST1", 200, 200, BLRgba32(255,0,0,255), BLRgba32(0xFF000000), 1, 25);
+        DrawManager::DrawOutlinedText(bctx, font, "TEST2", 200, 250, BLRgba32(0,255,0,255), BLRgba32(0xFF000000), 1, 50);
+
+        DrawManager::DrawLine(bctx, pX, pY, BLRgba32(0,255,0,255), 1.5f, true);
+        DrawManager::DrawGlowLine(bctx, p2X, p2Y, BLRgba32(255,0,0,255), 1.5f, 30);
+
+        DrawManager::DrawRect(bctx, 200, 275, 100, 100, BLRgba32(255, 0, 0, 255), 1.5f);
+        DrawManager::DrawRectFilled(bctx, 200, 400, 100, 100, BLRgba32(255, 0, 0, 255));
+
+        DrawManager::DrawCircle(bctx, 200, 550, 25, BLRgba32(255, 0, 0, 255), 1);
+        DrawManager::DrawCircleFilled(bctx, 200, 625, 25, BLRgba32(255, 0, 0, 255));
+
+        DrawManager::DrawHealthBar(bctx, 200, 700, 100, 100);
+        DrawManager::DrawHealthBar(bctx, 200, 775, 50, 100);
+
+        DrawManager::DrawFancyBox(bctx, 200, 875, 100, 100, BLRgba32(255, 0, 0, 255), 100/100);
+        DrawManager::DrawFancyBox(bctx, 350, 875, 100, 100, BLRgba32(255, 0, 0, 255), 50/100);
+
+        auto frameEnd = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> duration = frameEnd - frameStart;
+        frameTime = duration.count();
+        fps = 1000.0 / frameTime;
+
+        char info[64];
+        snprintf(info, sizeof(info), "FPS: %.1f | Time: %.2f ms", fps, frameTime);
+
+        DrawManager::DrawOutlinedText(bctx, font, info, 200, 50,
+                                      BLRgba32(0xFF0000FF),
+                                      BLRgba32(0xFF000000), 2, 30);
 
         renderer.Present();
     }

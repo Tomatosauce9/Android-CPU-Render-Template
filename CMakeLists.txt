@@ -68,6 +68,7 @@ set(FILE_SOURCES
         "src/AndroidRender/AndroidRender.cpp"
         "src/Menu/Menu.cpp"
         "src/Config/UserConfig.cpp"
+        "src/DrawManager/DrawManager.cpp"
 )
 
 add_executable(${PROJECT_NAME} ${FILE_SOURCES})
