@@ -65,13 +65,13 @@ cmake --build .
 After a successful build, push the binary to your device and set the necessary permissions:
 
 ```bash
-#推送文件
+# Push the binary to the device
 adb push outputs/arm64-v8a/CPURenderTemplate /data/local/tmp/
 
-#赋予执行权限并运行
+# Grant execute permission
 adb shell "chmod +x /data/local/tmp/CPURenderTemplate"
 
-#运行程序
+# Execute the binary (requires root)
 adb shell su -c "/data/local/tmp/CPURenderTemplate"
 ```
 
