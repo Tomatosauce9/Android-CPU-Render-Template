@@ -1,6 +1,6 @@
 # Android-CPU-Render-Template 🚀
 
-[English](./README.md) | [Chinese](./README-cn.md)
+[English](./README.md) | [中文](./README-cn.md)
 
 ## Introduction
 
