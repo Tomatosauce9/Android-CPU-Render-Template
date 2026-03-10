@@ -28,7 +28,7 @@ struct BLRgba32 {
 
   BL_INLINE_NODEBUG explicit BLRgba32(const BLRgba64& rgba64) noexcept { reset(rgba64); }
   BL_INLINE_CONSTEXPR BLRgba32(uint32_t r, uint32_t g, uint32_t b, uint32_t a = 0xFFu) noexcept
-    : value((r << 16) | (g << 8) | b | (a << 24)) {}
+    : value((r << 0) | (g << 8) | (b << 16) | (a << 24)) {}
 
   //! \}
 
