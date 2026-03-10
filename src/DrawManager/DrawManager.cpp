@@ -4,251 +4,147 @@
 
 #include "DrawManager.h"
 
-/**
- * @param fontSize  新增加的参数：字体大小
- */
+#include <algorithm>
+
+namespace {
+    constexpr float PI_2 = 1.570796f;
+    constexpr float TWO_PI = 6.283185f;
+}
+
 void DrawManager::DrawOutlinedText(BLContext& ctx, const BLFont& font,
-                                   const char* text,
-                                   float x, float y,
-                                   BLRgba32 fillColor,
-                                   BLRgba32 outlineColor,
-                                   int outlinePx,
-                                   float fontSize)
-{
-    BLFont scaledFont(font);
-    scaledFont.set_size(fontSize);
+                                   const char* text, float x, float y,
+                                   BLRgba32 fillColor, BLRgba32 outlineColor) {
+    thread_local BLGlyphBuffer gb;
+    gb.set_utf8_text(text);
+    font.shape(gb);
+    const BLGlyphRun& run = gb.glyph_run();
 
-    BLGlyphBuffer gb;
-    BLTextMetrics m;
+    BLTextMetrics tm;
+    font.get_text_metrics(gb, tm);
+    float textW = (float)(tm.bounding_box.x1 - tm.bounding_box.x0);
 
-    gb.set_utf8_text(text, strlen(text));
-    scaledFont.shape(gb);
-    scaledFont.get_text_metrics(gb, m);
-
-    float textW = m.bounding_box.x1 - m.bounding_box.x0;
-    float textX = x - textW * 0.5f;
+    BLPoint pos(std::floor(x - textW / 2.0f), std::floor(y));
 
     ctx.set_fill_style(outlineColor);
-    for (int dx = -outlinePx; dx <= outlinePx; ++dx) {
-        for (int dy = -outlinePx; dy <= outlinePx; ++dy) {
-            if (dx != 0 || dy != 0)
-                ctx.fill_glyph_run(BLPoint(textX + dx, y + dy), scaledFont, gb.glyph_run());
-        }
-    }
+    ctx.fill_glyph_run(BLPoint(pos.x + 2.0f, pos.y + 2.0f), font, run);
 
     ctx.set_fill_style(fillColor);
-    ctx.fill_glyph_run(BLPoint(textX, y), scaledFont, gb.glyph_run());
+    ctx.fill_glyph_run(pos, font, run);
 }
 
-void DrawManager::DrawGlowLine(BLContext& ctx,
-                  const BLPoint& start,
-                  const BLPoint& end,
-                  BLRgba32 color,
-                  float thickness,
-                  uint32_t glowAlpha)
-{
-    BLRgba32 glowColor(color.r(), color.g(), color.b(), glowAlpha);
+void DrawManager::DrawBatchRays(BLContext& ctx, const std::vector<BLPoint>& targets,
+                                BLPoint start, BLRgba32 color, float thickness) {
+    if (targets.empty()) return;
 
-    ctx.set_stroke_width(thickness * 2.0f);
-    ctx.set_stroke_style(glowColor);
-    ctx.stroke_line(start.x, start.y, end.x, end.y);
+    thread_local BLPath rayPath;
+    rayPath.clear();
 
-    ctx.set_stroke_width(thickness);
-    ctx.set_stroke_style(color);
-    ctx.stroke_line(start.x, start.y, end.x, end.y);
-}
-
-/**
- * @brief 绘制标准射线（单层直线）
- * * @param ctx        Blend2D 绘制上下文
- * @param start      起点坐标 (BLPoint)
- * @param end        终点坐标 (BLPoint)
- * @param color      线条颜色 (BLRgba32)
- * @param thickness  线条宽度 (默认 1.5f)
- * @param roundCap   是否使用圆头线端 (开启后视觉更平滑，默认开启)
- */
-void DrawManager::DrawLine(BLContext& ctx,
-                           const BLPoint& start,
-                           const BLPoint& end,
-                           BLRgba32 color,
-                           float thickness,
-                           bool roundCap)
-{
-    ctx.set_stroke_style(color);
-
-    ctx.set_stroke_width(thickness);
-
-    if (roundCap) {
-        ctx.set_stroke_caps(BL_STROKE_CAP_ROUND);
-    } else {
-        ctx.set_stroke_caps(BL_STROKE_CAP_BUTT);
+    for (const auto& end : targets) {
+        rayPath.move_to(start.x, start.y);
+        rayPath.line_to(end.x, end.y);
     }
 
+    ctx.set_stroke_style(color);
+    ctx.set_stroke_width(thickness);
+    ctx.stroke_path(rayPath);
+}
+
+void DrawManager::DrawLine(BLContext& ctx, const BLPoint& start, const BLPoint& end,
+                           BLRgba32 color, float thickness, bool roundCap) {
+    ctx.set_stroke_style(color);
+    ctx.set_stroke_width(thickness);
+    ctx.set_stroke_caps(roundCap ? BL_STROKE_CAP_ROUND : BL_STROKE_CAP_BUTT);
     ctx.stroke_line(start.x, start.y, end.x, end.y);
 }
 
 void DrawManager::DrawRect(BLContext& ctx, float x, float y, float w, float h,
-                     BLRgba32 color, float thickness)
-{
+                           BLRgba32 color, float thickness) {
     ctx.set_stroke_style(color);
     ctx.set_stroke_width(thickness);
-    ctx.stroke_rect(x, y, w, h);
+    ctx.stroke_rect(std::floor(x), std::floor(y), std::floor(w), std::floor(h));
 }
 
 void DrawManager::DrawRectFilled(BLContext& ctx, float x, float y, float w, float h,
-                           BLRgba32 color)
-{
+                                 BLRgba32 color) {
     ctx.set_fill_style(color);
-    ctx.fill_rect(x, y, w, h);
+    ctx.fill_rect(std::floor(x), std::floor(y), std::floor(w), std::floor(h));
 }
 
 void DrawManager::DrawCircle(BLContext& ctx, float centerX, float centerY, float radius,
-                       BLRgba32 color, float thickness)
+                             BLRgba32 color, float thickness)
 {
+    float ix = std::floor(centerX);
+    float iy = std::floor(centerY);
+    float ir = std::floor(radius);
+
     ctx.set_stroke_style(color);
     ctx.set_stroke_width(thickness);
-    ctx.stroke_circle(centerX, centerY, radius);
+
+    ctx.stroke_circle(ix, iy, ir);
 }
 
 void DrawManager::DrawCircleFilled(BLContext& ctx, float centerX, float centerY, float radius,
-                             BLRgba32 color)
+                                   BLRgba32 color)
 {
+    float ix = std::floor(centerX);
+    float iy = std::floor(centerY);
+    float ir = std::floor(radius);
+
     ctx.set_fill_style(color);
-    ctx.fill_circle(centerX, centerY, radius);
+
+    ctx.fill_circle(ix, iy, ir);
 }
 
 void DrawManager::DrawHealthBar(BLContext& bctx, float x, float y, float health, float maxHealth) {
-    health = (health < 0) ? 0 : (health > maxHealth) ? maxHealth : health;
-    float ratio = health / maxHealth;
+    float ratio = std::max(0.0f, std::min(1.0f, health / maxHealth));
 
-    const float outerRadius = 28.0f;
-    const float innerRadius = 22.0f;
-//    const float thickness = outerRadius - innerRadius;
-    const int segments = 60;
-    const float startAngle = -90.0f;
-    const float totalAngle = 360.0f;
-    const float endAngle = startAngle + totalAngle * ratio;
+    float w = 50.0f;
+    float h = 4.0f;
+    float ix = std::floor(x - w/2);
+    float iy = std::floor(y);
 
-    uint8_t red = static_cast<uint8_t>((1.0f - ratio) * 255);
-    uint8_t green = static_cast<uint8_t>(ratio * 255);
+    bctx.set_fill_style(BLRgba32(0, 0, 0, 150));
+    bctx.fill_rect(ix, iy, w, h);
 
-    BLRgba32 glowColor(0, green, red, 80);
-    BLRgba32 mainColor(0, green, red, 255);
-    BLRgba32 bgColor(30, 30, 40, 200);
-    BLRgba32 coreColor(0, 200, 255, 150);
+    uint8_t r = static_cast<uint8_t>((1.0f - ratio) * 255);
+    uint8_t g = static_cast<uint8_t>(ratio * 255);
 
-    bctx.set_fill_style(bgColor);
-    bctx.fill_circle(x, y, outerRadius);
+    bctx.set_fill_style(BLRgba32(r, g, 0, 255));
+    bctx.fill_rect(ix, iy, w * ratio, h);
 
-    if (ratio > 0.01f) {
-        bctx.set_fill_style(glowColor);
-        for (int i = 0; i < segments; ++i) {
-            float angle1 = startAngle + (i / (float)segments) * (endAngle - startAngle);
-            float angle2 = startAngle + ((i + 1) / (float)segments) * (endAngle - startAngle);
-
-            float rad1 = angle1 * 3.14159265f / 180.0f;
-            float rad2 = angle2 * 3.14159265f / 180.0f;
-
-            BLPoint points[4];
-            points[0] = BLPoint(x + cos(rad1) * innerRadius, y + sin(rad1) * innerRadius);
-            points[1] = BLPoint(x + cos(rad2) * innerRadius, y + sin(rad2) * innerRadius);
-            points[2] = BLPoint(x + cos(rad2) * (outerRadius + 4), y + sin(rad2) * (outerRadius + 4));
-            points[3] = BLPoint(x + cos(rad1) * (outerRadius + 4), y + sin(rad1) * (outerRadius + 4));
-
-            bctx.fill_polygon(points, 4);
-        }
-
-        bctx.set_fill_style(mainColor);
-        for (int i = 0; i < segments; ++i) {
-            float angle1 = startAngle + (i / (float)segments) * (endAngle - startAngle);
-            float angle2 = startAngle + ((i + 1) / (float)segments) * (endAngle - startAngle);
-
-            float rad1 = angle1 * 3.14159265f / 180.0f;
-            float rad2 = angle2 * 3.14159265f / 180.0f;
-
-            BLPoint points[4];
-            points[0] = BLPoint(x + cos(rad1) * innerRadius, y + sin(rad1) * innerRadius);
-            points[1] = BLPoint(x + cos(rad2) * innerRadius, y + sin(rad2) * innerRadius);
-            points[2] = BLPoint(x + cos(rad2) * outerRadius, y + sin(rad2) * outerRadius);
-            points[3] = BLPoint(x + cos(rad1) * outerRadius, y + sin(rad1) * outerRadius);
-
-            bctx.fill_polygon(points, 4);
-        }
-
-        bctx.set_fill_style(coreColor);
-        for (int i = 0; i < segments; ++i) {
-            float angle1 = startAngle + (i / (float)segments) * (endAngle - startAngle);
-            float angle2 = startAngle + ((i + 1) / (float)segments) * (endAngle - startAngle);
-
-            float rad1 = angle1 * 3.14159265f / 180.0f;
-            float rad2 = angle2 * 3.14159265f / 180.0f;
-
-            BLPoint points[4];
-            points[0] = BLPoint(x + cos(rad1) * (innerRadius + 2), y + sin(rad1) * (innerRadius + 2));
-            points[1] = BLPoint(x + cos(rad2) * (innerRadius + 2), y + sin(rad2) * (innerRadius + 2));
-            points[2] = BLPoint(x + cos(rad2) * (outerRadius - 2), y + sin(rad2) * (outerRadius - 2));
-            points[3] = BLPoint(x + cos(rad1) * (outerRadius - 2), y + sin(rad1) * (outerRadius - 2));
-
-            bctx.fill_polygon(points, 4);
-        }
-    }
-
-    bctx.set_stroke_style(BLRgba32(0, 200, 255, 100));
-    bctx.set_stroke_width(1.5f);
-    bctx.stroke_circle(x, y, innerRadius);
-    bctx.stroke_circle(x, y, outerRadius);
-
-    bctx.set_fill_style(BLRgba32(0, 0, 0, 180));
-    bctx.fill_circle(x, y, innerRadius - 2);
-}
-
-void DrawManager::DrawFancyBox(BLContext &bctx, float x, float y, float w, float h, BLRgba32 color, float healthPercent) {
-    // 外发光效果
-    for (int i = 3; i >= 0; i--) {
-        float alpha = 50 + i * 30;
-        BLRgba32 glowColor = BLRgba32(color.r(), color.g(), color.b(), (uint8_t)alpha);
-        bctx.set_stroke_style(glowColor);
-        bctx.set_stroke_width(1.0f + i * 0.5f);
-        bctx.stroke_rect(x - i*0.5f, y - i*0.5f, w + i, h + i);
-    }
-
-    // 主边框
-    bctx.set_stroke_style(color);
-    bctx.set_stroke_width(2.0f);
-    bctx.stroke_rect(x, y, w, h);
-
-    // 内发光
     bctx.set_stroke_style(BLRgba32(255, 255, 255, 100));
     bctx.set_stroke_width(1.0f);
-    bctx.stroke_rect(x + 1, y + 1, w - 2, h - 2);
+    bctx.stroke_rect(ix, iy, w, h);
+}
 
-    // 血量条
-    if (healthPercent < 0.99f) {
-        float healthBarWidth = w - 4;
-        float healthBarX = x + 2;
-        float healthBarY = y - 8;
-        float healthBarHeight = 4;
+void DrawManager::DrawFancyBox(BLContext &bctx, float x, float y, float w, float h,
+                               BLRgba32 color, float healthPercent) {
+    float ix = std::floor(x);
+    float iy = std::floor(y);
+    float iw = std::floor(w);
+    float ih = std::floor(h);
 
-        // 血条背景
-        bctx.set_fill_style(BLRgba32(0, 0, 0, 180));
-        bctx.fill_round_rect(healthBarX, healthBarY, healthBarWidth, healthBarHeight, 2.0f);
+    bctx.set_stroke_style(BLRgba32(color.r(), color.g(), color.b(), 60));
+    bctx.set_stroke_width(3.0f);
+    bctx.stroke_rect(ix - 1.0f, iy - 1.0f, iw + 2.0f, ih + 2.0f);
 
-        // 血条颜色
-        BLRgba32 healthColor;
-        if (healthPercent > 0.7f) {
-            healthColor = BLRgba32(0, 255, 0, 255);
-        } else if (healthPercent > 0.3f) {
-            healthColor = BLRgba32(255, 165, 0, 255);
-        } else {
-            healthColor = BLRgba32(255, 0, 0, 255);
-        }
+    bctx.set_stroke_style(color);
+    bctx.set_stroke_width(1.5f);
+    bctx.stroke_rect(ix, iy, iw, ih);
 
-        bctx.set_fill_style(healthColor);
-        bctx.fill_round_rect(healthBarX, healthBarY, healthBarWidth * healthPercent, healthBarHeight, 2.0f);
+    float hbW = 3.0f;
+    float hbH = ih;
+    float hbX = ix - 6.0f;
+    float hbY = iy;
 
-        // 血条边框
-        bctx.set_stroke_style(BLRgba32(255, 255, 255, 80));
-        bctx.set_stroke_width(0.8f);
-        bctx.stroke_round_rect(healthBarX, healthBarY, healthBarWidth, healthBarHeight, 2.0f);
-    }
+    bctx.set_fill_style(BLRgba32(0, 0, 0, 150));
+    bctx.fill_rect(hbX, hbY, hbW, hbH);
+
+    BLRgba32 hColor = (healthPercent > 0.7f) ? BLRgba32(0, 255, 0) :
+                      (healthPercent > 0.3f) ? BLRgba32(255, 165, 0) : BLRgba32(255, 0, 0);
+
+    bctx.set_fill_style(hColor);
+
+    float currentH = hbH * healthPercent;
+    bctx.fill_rect(hbX, hbY + (hbH - currentH), hbW, currentH);
 }
