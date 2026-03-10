@@ -9,7 +9,6 @@
 #include <TouchHelperA.h>
 #include <dirent.h>
 
-
 #include "AndroidRender/AndroidRender.h"
 #include "Menu/Menu.h"
 #include "Config/UserConfig.h"
@@ -59,19 +58,18 @@ void get_menu_state() {
         volumedevicefilearray[i] = open(inputfilepath, O_RDWR | O_NONBLOCK);
     }
     for (;;) {
+        bool key_detected = false;
         for (int i = 0; i < eventcount; i++) {
-            memset(&event, 0, sizeof(input_event));
-            read(volumedevicefilearray[i], &event, sizeof(event));
-            if (event.type == EV_KEY && event.value == 1) {
-                auto& menu = Menu::GetInstance();
-                if (event.code == KEY_VOLUMEUP) {
-                    menu.Toggle();
-                } else if (event.code == KEY_VOLUMEDOWN) {
-                    menu.Toggle();
+            if (read(volumedevicefilearray[i], &event, sizeof(event)) > 0) {
+                if (event.type == EV_KEY && event.value == 1) {
+                    if (event.code == KEY_VOLUMEUP || event.code == KEY_VOLUMEDOWN) {
+                        Menu::GetInstance().Toggle();
+                        key_detected = true;
+                    }
                 }
             }
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
 }
@@ -97,34 +95,41 @@ int main() {
 
     auto lastOrientationChange = std::chrono::steady_clock::now();
 
-    auto* get_menu_stateth = new std::thread(&get_menu_state);
-    get_menu_stateth->detach();
+    std::thread menuThread([&]() {
+        get_menu_state();
+    });
+    menuThread.detach();
 
-    double frameTime = 0.0;
-    double fps = 0.0;
+    const int targetFPS = 120;
+    const std::chrono::nanoseconds frameTargetTime(1000000000 / targetFPS);
+    static char info[64] = "";
+    static auto lastFpsUpdate = std::chrono::steady_clock::now();
 
     while (g_Config.renderloop) {
 
         auto frameStart = std::chrono::high_resolution_clock::now();
-
         auto now = std::chrono::steady_clock::now();
-        auto newDisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
 
-        bool isChanged = (newDisplayInfo.orientation != screenState.current_orientation ||
-                          newDisplayInfo.width != screenState.screen_width ||
-                          newDisplayInfo.height != screenState.screen_height || g_Config.permeate_record != screenState.permeate_record);
+        static int checkCounter = 0;
+        if (checkCounter++ % 30 == 0) {
+            auto newDisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
 
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastOrientationChange).count();
+            bool isChanged = (newDisplayInfo.orientation != screenState.current_orientation ||
+                              newDisplayInfo.width != screenState.screen_width ||
+                              newDisplayInfo.height != screenState.screen_height || g_Config.permeate_record != screenState.permeate_record);
 
-        if (isChanged && elapsed > 500) {
-            lastOrientationChange = now;
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastOrientationChange).count();
 
-            screenState.update(newDisplayInfo);
-            screenState.permeate_record = g_Config.permeate_record;
-            renderer.Recreate(newDisplayInfo, g_Config.permeate_record, menu, font);
+            if (isChanged && elapsed > 500) {
+                lastOrientationChange = now;
 
-            std::cout << "分辨率更新: " << screenState.screen_width << "x" << screenState.screen_height  << std::endl;
-            std::cout << "防录屏更新: " << (g_Config.permeate_record ? "开启" : "关闭") << std::endl;
+                screenState.update(newDisplayInfo);
+                screenState.permeate_record = g_Config.permeate_record;
+                renderer.Recreate(newDisplayInfo, g_Config.permeate_record, menu, font);
+
+                std::cout << "分辨率更新: " << screenState.screen_width << "x" << screenState.screen_height  << std::endl;
+                std::cout << "防录屏更新: " << (g_Config.permeate_record ? "开启" : "关闭") << std::endl;
+            }
         }
 
         if (!g_Config.permeate_record) {
@@ -136,20 +141,22 @@ int main() {
         BLContext& bctx = renderer.GetContext();
         bctx.clear_all();
 
-        menu.Draw(renderer.GetWidth(), renderer.GetHeight());
-        menu.Render(bctx);
+        if (menu.IsVisible()) {
+            menu.Draw(renderer.GetWidth(), renderer.GetHeight());
+            menu.Render(bctx);
+        }
 
         BLPoint pX = {0,0};
-        BLPoint pY = {static_cast<double>(display.width),static_cast<double>(display.height)};
+        BLPoint pY = {static_cast<double>(screenState.screen_width),static_cast<double>(screenState.screen_height)};
 
-        BLPoint p2X = {static_cast<double>(display.width),0};
-        BLPoint p2Y = {0,static_cast<double>(display.height)};
+        BLPoint p2X = {static_cast<double>(screenState.screen_width),0};
+        BLPoint p2Y = {0,static_cast<double>(screenState.screen_height)};
 
-        DrawManager::DrawOutlinedText(bctx, font, "TEST1", 200, 200, BLRgba32(255,0,0,255), BLRgba32(0xFF000000), 1, 25);
-        DrawManager::DrawOutlinedText(bctx, font, "TEST2", 200, 250, BLRgba32(0,255,0,255), BLRgba32(0xFF000000), 1, 50);
+        DrawManager::DrawOutlinedText(bctx, font, "TEST1", 200, 200, BLRgba32(255,0,0,255), BLRgba32(0xFF000000));
+        DrawManager::DrawOutlinedText(bctx, font, "TEST2", 200, 250, BLRgba32(0,255,0,255), BLRgba32(0xFF000000));
 
         DrawManager::DrawLine(bctx, pX, pY, BLRgba32(0,255,0,255), 1.5f, true);
-        DrawManager::DrawGlowLine(bctx, p2X, p2Y, BLRgba32(255,0,0,255), 1.5f, 30);
+        DrawManager::DrawLine(bctx, p2X, p2Y, BLRgba32(255,0,0,255), 1.5f, 30);
 
         DrawManager::DrawRect(bctx, 200, 275, 100, 100, BLRgba32(255, 0, 0, 255), 1.5f);
         DrawManager::DrawRectFilled(bctx, 200, 400, 100, 100, BLRgba32(255, 0, 0, 255));
@@ -160,25 +167,27 @@ int main() {
         DrawManager::DrawHealthBar(bctx, 200, 700, 100, 100);
         DrawManager::DrawHealthBar(bctx, 200, 775, 50, 100);
 
-        DrawManager::DrawFancyBox(bctx, 200, 875, 100, 100, BLRgba32(255, 0, 0, 255), 100/100);
-        DrawManager::DrawFancyBox(bctx, 350, 875, 100, 100, BLRgba32(255, 0, 0, 255), 50/100);
-
-        auto frameEnd = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> duration = frameEnd - frameStart;
-        frameTime = duration.count();
-        fps = 1000.0 / frameTime;
-
-        char info[64];
-        snprintf(info, sizeof(info), "FPS: %.1f | Time: %.2f ms", fps, frameTime);
+        DrawManager::DrawFancyBox(bctx, 200, 875, 100, 100, BLRgba32(255, 0, 0, 255), 100.f/100.f);
+        DrawManager::DrawFancyBox(bctx, 350, 875, 100, 100, BLRgba32(255, 0, 0, 255), 50.f/100.f);
 
         DrawManager::DrawOutlinedText(bctx, font, info, 200, 50,
-                                      BLRgba32(0xFF0000FF),
-                                      BLRgba32(0xFF000000), 2, 30);
+                                      BLRgba32(0xFF0000FF), BLRgba32(0xFF000000));
 
         renderer.Present();
+
+        auto frameEnd = std::chrono::high_resolution_clock::now();
+        auto workDuration = frameEnd - frameStart;
+
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFpsUpdate).count() > 500) {
+            double ms = std::chrono::duration<double, std::milli>(workDuration).count();
+            snprintf(info, sizeof(info), "FPS: %.1f | %.2f ms", 1000.0 / (ms > 1.0 ? ms : 11.0), ms);
+            lastFpsUpdate = now;
+        }
+
+        if (workDuration < frameTargetTime) {
+            std::this_thread::sleep_for(frameTargetTime - workDuration);
+        }
     }
-    delete get_menu_stateth;
 
     return 0;
-
 }

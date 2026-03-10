@@ -21,7 +21,7 @@ public:
 
     void HandleInput();
 
-    void Draw(int screen_width, int screen_height);
+    void Draw(int render_width, int render_height);
 
     void Render(BLContext& bctx);
 

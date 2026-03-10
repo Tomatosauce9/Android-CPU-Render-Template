@@ -18,13 +18,12 @@
     do { \
         nk_layout_row_dynamic(ctx, 30, 2); \
         nk_label(ctx, label, NK_TEXT_LEFT); \
-        char _b[64]; snprintf(_b, sizeof(_b), fmt, (float)*(v)); \
-        nk_label_colored(ctx, _b, NK_TEXT_RIGHT, nk_rgb(255, 165, 0)); \
-        nk_layout_row_dynamic(ctx, 38, 1); \
         float _val = (float)*(v); \
         if (nk_slider_float(ctx, (float)min, &_val, (float)max, (float)step)) { \
             *(v) = (__typeof__(*(v)))_val; \
         } \
+        char _b[32]; snprintf(_b, sizeof(_b), fmt, (float)*(v)); \
+        nk_label_colored(ctx, _b, NK_TEXT_RIGHT, nk_rgb(255, 165, 0)); \
     } while (0)
 
 Menu& Menu::GetInstance() {
@@ -68,11 +67,18 @@ void Menu::HandleInput() {
     nk_input_end(&m_Ctx);
 }
 
-void Menu::Draw(int screen_width, int screen_height) {
+void Menu::Draw(int render_width, int render_height) {
     if (!m_ShowMenu) return;
 
-    float f_w = 1050, f_h = 750;
-    struct nk_rect win_r = nk_rect((static_cast<float>(screen_width) - f_w)/2, (static_cast<float>(screen_height) - f_h)/2, f_w, f_h);
+    float f_w = 1050;
+    float f_h = 750;
+
+    struct nk_rect win_r = nk_rect(
+            (render_width - f_w + 800) / 2.0f,
+            (render_height - f_h + 500 ) / 2.0f,
+            f_w,
+            f_h
+    );
 
     if (nk_begin(&m_Ctx, "CPU-Render", win_r, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BORDER | NK_WINDOW_MOVABLE)) {
 

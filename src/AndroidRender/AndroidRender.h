@@ -17,8 +17,6 @@ class Menu;
 class AndroidRender {
 protected:
     ANativeWindow *m_Window = nullptr;
-    int m_Width = 0;
-    int m_Height = 0;
 
     BLImage m_Canvas;
     BLContext m_Ctx;
@@ -40,10 +38,14 @@ public:
 
     void Release();
 
-    int GetWidth() const { return m_Width; }
-    int GetHeight() const { return m_Height; }
+    int GetWidth() const { return m_RenderW; }
+    int GetHeight() const { return m_RenderH; }
 
 private:
+    float m_Scale = 0.6f;
+    int m_RenderW, m_RenderH;
+    int m_BaseW, m_BaseH;
+
     AndroidRender() = default;
     ~AndroidRender();
 

@@ -17,27 +17,22 @@ AndroidRender& AndroidRender::GetInstance() {
 
 bool AndroidRender::Init(ANativeWindow *window, int width, int height) {
     std::lock_guard<std::mutex> lock(m_RenderMutex);
-
     m_Window = window;
-    m_Width = width;
-    m_Height = height;
+    m_BaseW = width;
+    m_BaseH = height;
 
-    ANativeWindow_setBuffersGeometry(window, width, height, WINDOW_FORMAT_RGBA_8888);
+    m_RenderW = (int)(width * m_Scale);
+    m_RenderH = (int)(height * m_Scale);
 
-    BLResult result = m_Canvas.create(width, height, BL_FORMAT_XRGB32);
-    if (result != BL_SUCCESS) {
-        std::cout << "创建 Blend2D Image 失败: " << result << "\n";
-        return false;
-    }
+    ANativeWindow_setBuffersGeometry(m_Window, m_RenderW, m_RenderH, WINDOW_FORMAT_RGBA_8888);
+
+    m_Canvas.create(m_RenderW, m_RenderH, BL_FORMAT_XRGB32);
 
     BLContextCreateInfo createInfo{};
     createInfo.thread_count = 4;
-
-    m_Ctx.end();
     m_Ctx.begin(m_Canvas, createInfo);
 
-    m_Ctx.set_comp_op(BL_COMP_OP_SRC_OVER);
-    m_Ctx.set_stroke_width(1.0);
+    m_Ctx.scale(m_Scale);
 
     return true;
 }
@@ -45,52 +40,55 @@ bool AndroidRender::Init(ANativeWindow *window, int width, int height) {
 void AndroidRender::Recreate(const android::ANativeWindowCreator::DisplayInfo& info, bool permeate, Menu& menu, BLFont& font) {
     std::lock_guard<std::mutex> lock(m_RenderMutex);
 
+    m_Ctx.end();
+    m_Canvas.reset();
     if (m_Window) {
         android::ANativeWindowCreator::Destroy(m_Window);
     }
-    m_Ctx.end();
-    m_Canvas.reset();
 
-    m_Width = info.width;
-    m_Height = info.height;
-    m_Window = android::ANativeWindowCreator::Create("Nuklear", m_Width, m_Height, permeate);
-    ANativeWindow_setBuffersGeometry(m_Window, m_Width, m_Height, WINDOW_FORMAT_RGBA_8888);
+    m_BaseW = info.width;
+    m_BaseH = info.height;
 
-    m_Canvas.create(m_Width, m_Height, BL_FORMAT_XRGB32);
+    m_RenderW = (int)(m_BaseW * m_Scale);
+    m_RenderH = (int)(m_BaseH * m_Scale);
+
+    m_Window = android::ANativeWindowCreator::Create("Nuklear", m_BaseW, m_BaseH, permeate);
+    ANativeWindow_setBuffersGeometry(m_Window, m_RenderW, m_RenderH, WINDOW_FORMAT_RGBA_8888);
+
+    m_Canvas.create(m_RenderW, m_RenderH, BL_FORMAT_XRGB32);
+
     BLContextCreateInfo createInfo{};
     createInfo.thread_count = 4;
     m_Ctx.begin(m_Canvas, createInfo);
+
+    m_Ctx.scale(m_Scale);
 
     menu.Init(font);
 }
 
 void AndroidRender::Present() {
-    if (!m_Window || !m_Canvas._impl()) return;
-
     std::lock_guard<std::mutex> lock(m_RenderMutex);
+    if (!m_Window || m_Canvas.is_empty()) return;
 
     m_Ctx.flush(BL_CONTEXT_FLUSH_SYNC);
 
     ANativeWindow_Buffer buffer;
-    if (ANativeWindow_lock(m_Window, &buffer, nullptr) != 0) {
-        std::cout << "无法锁定window\n";
-        return;
-    }
+    if (ANativeWindow_lock(m_Window, &buffer, nullptr) != 0) return;
 
-    BLImageData data{};
+    BLImageData data;
     m_Canvas.get_data(&data);
 
-    auto* src = (uint8_t*)data.pixel_data;
-    auto* dst = (uint8_t*)buffer.bits;
+    uint8_t* dst = (uint8_t*)buffer.bits;
+    uint8_t* src = (uint8_t*)data.pixel_data;
 
-    int copyWidthBytes = std::min(m_Width, buffer.width) * 4;
-    int copyHeight = std::min(m_Height, buffer.height);
-    int srcStride = static_cast<int>(data.stride);
-    int dstStride = buffer.stride * 4;
-
-#pragma omp parallel for if(copyHeight > 200)
-    for (int y = 0; y < copyHeight; y++) {
-        std::memcpy(dst + y * dstStride, src + y * srcStride, copyWidthBytes);
+    if (buffer.stride * 4 == data.stride) {
+        memcpy(dst, src, data.stride * m_RenderH);
+    } else {
+        for (int y = 0; y < m_RenderH; y++) {
+            memcpy(dst + y * buffer.stride * 4,
+                   src + y * data.stride,
+                   m_RenderW * 4);
+        }
     }
 
     ANativeWindow_unlockAndPost(m_Window);
